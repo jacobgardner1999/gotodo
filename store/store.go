@@ -38,6 +38,14 @@ func NewUser(id, name string) User {
 	}
 }
 
+func NewTodoList(id, name string) TodoList {
+	return TodoList{
+		ID:    id,
+		Name:  name,
+		Todos: make(map[string]Todo),
+	}
+}
+
 func (s *InMemoryStore) CreateUser(user User) error {
 	if _, exists := s.users[user.ID]; exists {
 		return fmt.Errorf("user with ID %s already exists", user.ID)
@@ -46,11 +54,21 @@ func (s *InMemoryStore) CreateUser(user User) error {
 	return nil
 }
 
-func (u *User) AddTodoList(list TodoList) error {
-	if _, exists := u.TodoLists[list.ID]; exists {
-		return fmt.Errorf("list with ID %s for user %s already exists", list.ID, u.ID)
+func (s *InMemoryStore) AddTodoList(list TodoList, userID string) error {
+	user := s.users[userID]
+	if _, exists := user.TodoLists[list.ID]; exists {
+		return fmt.Errorf("list with ID %s for user %s already exists", list.ID, userID)
 	}
 
-	u.TodoLists[list.ID] = list
+	user.TodoLists[list.ID] = list
+	return nil
+}
+
+func (s *InMemoryStore) AddTodo(todo Todo, listID string, userID string) error {
+	list := s.users[userID].TodoLists[listID]
+	if _, exists := list.Todos[todo.ID]; exists {
+		return fmt.Errorf("todo with ID %s in list ID %s for user ID %s already exists", todo.ID, listID, userID)
+	}
+	list.Todos[todo.ID] = todo
 	return nil
 }
