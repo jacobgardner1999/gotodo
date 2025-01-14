@@ -3,19 +3,19 @@ package store
 import "fmt"
 
 type InMemoryStore struct {
-	users map[string]User
+	users map[string]*User
 }
 
 type User struct {
 	ID        string
 	Name      string
-	TodoLists map[string]TodoList
+	TodoLists map[string]*TodoList
 }
 
 type TodoList struct {
 	ID    string
 	Name  string
-	Todos map[string]Todo
+	Todos map[string]*Todo
 }
 
 type Todo struct {
@@ -26,7 +26,7 @@ type Todo struct {
 
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
-		users: make(map[string]User),
+		users: make(map[string]*User),
 	}
 }
 
@@ -34,7 +34,7 @@ func NewUser(id, name string) User {
 	return User{
 		ID:        id,
 		Name:      name,
-		TodoLists: make(map[string]TodoList),
+		TodoLists: make(map[string]*TodoList),
 	}
 }
 
@@ -42,7 +42,7 @@ func NewTodoList(id, name string) TodoList {
 	return TodoList{
 		ID:    id,
 		Name:  name,
-		Todos: make(map[string]Todo),
+		Todos: make(map[string]*Todo),
 	}
 }
 
@@ -50,8 +50,16 @@ func (s *InMemoryStore) CreateUser(user User) error {
 	if _, exists := s.users[user.ID]; exists {
 		return fmt.Errorf("user with ID %s already exists", user.ID)
 	}
-	s.users[user.ID] = user
+	s.users[user.ID] = &user
 	return nil
+}
+
+func (s *InMemoryStore) GetUser(userID string) (User, error) {
+	if _, exists := s.users[userID]; !exists {
+		return User{}, fmt.Errorf("no user found with ID %s", userID)
+	}
+
+	return *s.users[userID], nil
 }
 
 func (s *InMemoryStore) AddTodoList(list TodoList, userID string) error {
@@ -60,7 +68,7 @@ func (s *InMemoryStore) AddTodoList(list TodoList, userID string) error {
 		return fmt.Errorf("list with ID %s for user %s already exists", list.ID, userID)
 	}
 
-	user.TodoLists[list.ID] = list
+	user.TodoLists[list.ID] = &list
 	return nil
 }
 
@@ -69,6 +77,25 @@ func (s *InMemoryStore) AddTodo(todo Todo, listID string, userID string) error {
 	if _, exists := list.Todos[todo.ID]; exists {
 		return fmt.Errorf("todo with ID %s in list ID %s for user ID %s already exists", todo.ID, listID, userID)
 	}
-	list.Todos[todo.ID] = todo
+	list.Todos[todo.ID] = &todo
 	return nil
+}
+
+func (s *InMemoryStore) CompleteTodo(userID string, listID string, todoID string) error {
+	user := s.users[userID]
+	list := user.TodoLists[listID]
+
+	if _, exists := list.Todos[todoID]; !exists {
+		return fmt.Errorf("todo with ID %s in list ID %s for user ID %s does not exist", todoID, listID, userID)
+	}
+
+	todo := list.Todos[todoID]
+
+	todo.Complete()
+
+	return nil
+}
+
+func (t *Todo) Complete() {
+	t.Completed = true
 }

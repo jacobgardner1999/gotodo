@@ -1,6 +1,9 @@
 package store
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestAddUser(t *testing.T) {
 	store := NewInMemoryStore()
@@ -92,5 +95,53 @@ func TestAddTodo(t *testing.T) {
 
 	if got != want {
 		t.Errorf("got %q want %q", got, want)
+	}
+}
+
+func TestAddDuplicateTodoID(t *testing.T) {
+	store := NewInMemoryStore()
+
+	user := NewUser("0001", "Steve")
+	store.CreateUser(user)
+
+	list := NewTodoList("0001", "test list")
+	store.AddTodoList(list, "0001")
+
+	todo := Todo{"0001", "original", false}
+	todo2 := Todo{"0001", "duplicate", false}
+	store.AddTodo(todo, "0001", "0001")
+
+	err := store.AddTodo(todo2, "0001", "0001")
+
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+
+	want := "todo with ID 0001 in list ID 0001 for user ID 0001 already exists"
+
+	if err.Error() != want {
+		t.Errorf("got %q want %q", err.Error(), want)
+	}
+}
+
+func TestCompleteTodo(t *testing.T) {
+	store := NewInMemoryStore()
+
+	user := NewUser("0001", "Steve")
+	store.CreateUser(user)
+
+	list := NewTodoList("0001", "test list")
+	store.AddTodoList(list, "0001")
+
+	todo := Todo{"0001", "to complete", false}
+	store.AddTodo(todo, "0001", "0001")
+
+	store.CompleteTodo("0001", "0001", "0001")
+
+	got := user.TodoLists["0001"].Todos["0001"].Completed
+	want := true
+
+	if got != want {
+		t.Errorf("got %q want %q", strconv.FormatBool(got), strconv.FormatBool(want))
 	}
 }
