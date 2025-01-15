@@ -12,153 +12,138 @@ import (
 )
 
 type model struct {
-	state     string
-	width     int
-	height    int
-	store     *store.InMemoryStore
-	userID    string
-	user      *store.User
-	toDoLists []*store.TodoList
-	list      *store.TodoList
-	toDoList  []*store.Todo
-	title     string
-	cursor    int
+	state      string
+	page       string
+	store      *store.InMemoryStore
+	user       *store.User
+	toDoLists  []*store.TodoList
+	list       *store.TodoList
+	toDoList   []*store.Todo
+	input      string
+	cursor     int
+	loginError string
 }
 
 func InitialModel() model {
 	return model{
-		state:     "login",
-		width:     0,
-		height:    0,
-		store:     store.NewInMemoryStore(),
-		userID:    "",
-		user:      &store.User{},
-		toDoLists: []*store.TodoList{},
-		list:      nil,
-		toDoList:  []*store.Todo{},
-		title:     "",
-		cursor:    0,
+		state:      "userInput",
+		page:       "login",
+		store:      store.NewInMemoryStore(),
+		user:       &store.User{},
+		toDoLists:  []*store.TodoList{},
+		list:       nil,
+		toDoList:   []*store.Todo{},
+		input:      "",
+		cursor:     0,
+		loginError: "",
 	}
 }
 
 type Msg string
 
 func (m model) Init() tea.Cmd {
-	user := store.User{ID: "0001", Name: "Jacob", TodoLists: make(map[string]*store.TodoList)}
-
-	m.store.CreateUser(user)
+	m.store.CreateUser("Jacob")
 	return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.state {
-	case "login":
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "enter":
-				user, err := m.store.GetUser(m.userID)
-				if err != nil {
-					fmt.Println("Error obtaining user with ID ", m.userID)
-					break
-				}
-				m.user = &user
-				m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
-				m.state = "main"
-				m.cursor = 0
-			case "backspace":
-				m.userID = m.userID[:len(m.userID)-1]
-			case "ctrl+c":
-				return m, tea.Quit
-			default:
-				m.userID += msg.String()
-			}
-		case tea.WindowSizeMsg:
-			m.width = msg.Width
-			m.height = msg.Height
-		}
-	case "main":
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch m.state {
+		case "main":
 			switch msg.String() {
 			case "k", "up":
 				if m.cursor > 0 {
 					m.cursor--
 				}
 			case "j", "down":
-				if m.cursor < len(m.toDoLists)-1 {
-					m.cursor++
+				switch m.page {
+				case "lists":
+					if m.cursor < len(m.toDoLists)-1 {
+						m.cursor++
+					}
+				case "todos":
+					if m.cursor < len(m.toDoList)-1 {
+						m.cursor++
+					}
 				}
 			case "h", "left":
-				m.state = "login"
+				switch m.page {
+				case "lists":
+					m.state = "userInput"
+					m.page = "login"
+					m.cursor = 0
+				case "todos":
+					m.page = "lists"
+					m.cursor = 0
+				}
 			case "a":
-				m.state = "addList"
+				m.state = "userInput"
 			case "enter", "l", "right":
-				m.toDoList = slices.Collect(maps.Values(m.toDoLists[m.cursor].Todos))
-				m.list = m.toDoLists[m.cursor]
-				m.state = "list"
-				m.cursor = 0
+				switch m.page {
+				case "lists":
+					m.toDoList = slices.Collect(maps.Values(m.toDoLists[m.cursor].Todos))
+					m.list = m.toDoLists[m.cursor]
+					m.page = "todos"
+					m.cursor = 0
+				case "todos":
+					m.store.CompleteTodo(m.user.ID, m.list.ID, m.toDoList[m.cursor].ID)
+				case "addUser":
+					m.state = "userInput"
+					m.page = "login"
+					m.cursor = 0
+					m.input = ""
+				}
 			case "q", "ctrl+c":
 				return m, tea.Quit
 			}
-		}
-	case "addList":
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case "userInput":
 			switch msg.String() {
 			case "enter":
-				m.store.AddTodoList(store.NewTodoList(strconv.Itoa(len(m.toDoLists)), m.title), m.user.ID)
-				m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
-				m.title = ""
-				m.state = "main"
-				m.cursor = 0
-			case "backspace":
-				m.title = m.title[:len(m.title)-1]
-			case "ctrl+c":
-				return m, tea.Quit
-			default:
-				m.title += msg.String()
-			}
-		}
-	case "addTodo":
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "enter":
-				todo := store.Todo{ID: strconv.Itoa(len(m.toDoList)), Title: m.title, Completed: false}
-				m.store.AddTodo(todo, m.list.ID, m.user.ID)
-				m.toDoList = slices.Collect(maps.Values(m.list.Todos))
-				m.title = ""
-				m.state = "list"
-				m.cursor = 0
-			case "backspace":
-				m.title = m.title[:len(m.title)-1]
-			case "ctrl+c":
-				return m, tea.Quit
-			default:
-				m.title += msg.String()
-			}
-		}
-	case "list":
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			switch msg.String() {
-			case "k", "up":
-				if m.cursor > 0 {
-					m.cursor--
+				switch m.page {
+				case "login":
+					user, err := m.store.GetUser(m.input)
+					if err != nil {
+						m.loginError = "failed to get user with ID " + m.input
+						break
+					}
+					m.user = &user
+					m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
+					m.state = "main"
+					m.page = "lists"
+					m.input = ""
+					m.cursor = 0
+				case "lists":
+					m.store.AddTodoList(store.NewTodoList(strconv.Itoa(len(m.toDoLists)), m.input), m.user.ID)
+					m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
+					m.input = ""
+					m.state = "main"
+					m.cursor = 0
+				case "todos":
+					todo := store.Todo{ID: strconv.Itoa(len(m.toDoList)), Title: m.input, Completed: false}
+					m.store.AddTodo(todo, m.list.ID, m.user.ID)
+					m.toDoList = slices.Collect(maps.Values(m.list.Todos))
+					m.input = ""
+					m.state = "main"
+					m.cursor = 0
+				case "addUser":
+					id, _ := m.store.CreateUser(m.input)
+					m.input = id
+					m.state = "main"
+					m.cursor = 0
 				}
-			case "j", "down":
-				if m.cursor < len(m.toDoList)-1 {
-					m.cursor++
-				}
-			case "h", "left":
-				m.state = "main"
+			case "backspace":
+				m.input = m.input[:len(m.input)-1]
 			case "a":
-				m.state = "addTodo"
-			case "enter", "l", "right":
-				m.store.CompleteTodo(m.user.ID, m.list.ID, m.toDoList[m.cursor].ID)
-			case "ctrl+c", "q":
+				if m.page == "login" {
+					m.page = "addUser"
+				} else {
+					m.input += msg.String()
+				}
+			case "ctrl+c":
 				return m, tea.Quit
+			default:
+				m.input += msg.String()
 			}
 		}
 	}
@@ -168,49 +153,62 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	lineBreak := "\n--------------------\n"
 
-	if m.width == 0 {
-		return "loading..."
-	}
+	s := "Woah! Another Todo App!" + lineBreak
 
 	switch m.state {
-	case "login":
-		return "Enter your User ID to log in: " + m.userID + lineBreak + "\n (Press Enter to continue) \n"
 	case "main":
-		s := "Todo Lists:" + lineBreak
-		for i, list := range m.toDoLists {
-			cursor := " "
-			if i == m.cursor {
-				cursor = ">"
+		switch m.page {
+		case "lists":
+			s += "Todo Lists:" + lineBreak
+			for i, list := range m.toDoLists {
+				cursor := " "
+				if i == m.cursor {
+					cursor = ">"
+				}
+				s += fmt.Sprintf("%s %s\n", cursor, list.Name)
 			}
-			s += fmt.Sprintf("%s %s\n", cursor, list.Name)
-		}
-		s += lineBreak
-		s += "Press Enter to select, q to quit, a to add list"
-		return s
-	case "list":
-		s := "Todo list: " + m.list.Name
-		s += lineBreak
-		if len(m.toDoList) == 0 {
-			s += "--list is empty, press a to add a todo--"
-		}
-		for i, todo := range m.toDoList {
-			cursor := " "
-			if i == m.cursor {
-				cursor = ">"
+			s += lineBreak
+			s += "Press Enter to select, q to quit, a to add list"
+			return s
+		case "todos":
+			s += "Todo list: " + m.list.Name
+			s += lineBreak
+			if len(m.toDoList) == 0 {
+				s += "--list is empty, press a to add a todo--"
 			}
-			check := " "
-			if todo.Completed {
-				check = "X"
+			for i, todo := range m.toDoList {
+				cursor := " "
+				if i == m.cursor {
+					cursor = ">"
+				}
+				check := " "
+				if todo.Completed {
+					check = "X"
+				}
+				s += fmt.Sprintf("%s [%s] %s\n", cursor, check, todo.Title)
 			}
-			s += fmt.Sprintf("%s [%s] %s\n", cursor, check, todo.Title)
+			s += lineBreak
+			s += "Press Enter to complete task, q to quit, a to add todo"
+			return s
+		case "addUser":
+			s += "User added! Your ID is: " + m.input + lineBreak + "\n (Press Enter to continue)"
+			return s
 		}
-		s += lineBreak
-		s += "Press Enter to complete task, q to quit, a to add todo"
-		return s
-	case "addTodo":
-		return "What do you need to do? " + m.title + lineBreak + "\n (Press Enter to continue)"
-	case "addList":
-		return "Enter the name of your new list: " + m.title + lineBreak + "\n (Press Enter to continue)"
+	case "userInput":
+		switch m.page {
+		case "login":
+			s += "Enter your User ID to log in: " + m.input + lineBreak + m.loginError + "\n (Press Enter to continue, q to quit, a to add a user\n"
+			return s
+		case "todos":
+			s += "What do you need to do? " + m.input + lineBreak + "\n (Press Enter to continue)"
+			return s
+		case "lists":
+			s += "Enter the name of your new list: " + m.input + lineBreak + "\n (Press Enter to continue)"
+			return s
+		case "addUser":
+			s += "Enter your name: " + m.input + lineBreak + "\n (Press Enter to continue)"
+			return s
+		}
 	}
 	return ""
 }

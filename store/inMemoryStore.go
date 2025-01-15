@@ -45,8 +45,18 @@ func NewTodoList(id, name string) TodoList {
 		Todos: make(map[string]*Todo),
 	}
 }
+func (s *InMemoryStore) CreateUser(username string) (id string, e error) {
+	userID := fmt.Sprintf("%04d", len(s.users)+1)
+	user := NewUser(userID, username)
 
-func (s *InMemoryStore) CreateUser(user User) error {
+	err := s.addUser(user)
+	if err != nil {
+		return "", fmt.Errorf(err.Error())
+	}
+	return userID, nil
+}
+
+func (s *InMemoryStore) addUser(user User) error {
 	if _, exists := s.users[user.ID]; exists {
 		return fmt.Errorf("user with ID %s already exists", user.ID)
 	}
