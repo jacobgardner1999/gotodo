@@ -9,7 +9,7 @@ func TestAddUser(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	got := store.users["0001"].Name
 	want := "Steve"
@@ -25,8 +25,8 @@ func TestAddDuplicateUserID(t *testing.T) {
 	user := NewUser("0001", "Steve")
 	user2 := NewUser("0001", "Stephen")
 
-	store.CreateUser(user)
-	err := store.CreateUser(user2)
+	store.addUser(user)
+	err := store.addUser(user2)
 
 	if err == nil {
 		t.Fatal("expected an error")
@@ -43,7 +43,7 @@ func TestAddList(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	list := NewTodoList("0001", "test list")
 	store.AddTodoList(list, "0001")
@@ -60,7 +60,7 @@ func TestAddDuplicateListID(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	list := NewTodoList("0001", "test list")
 	list2 := NewTodoList("0001", "duplicate list")
@@ -83,7 +83,7 @@ func TestAddTodo(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	list := NewTodoList("0001", "test list")
 	store.AddTodoList(list, "0001")
@@ -102,7 +102,7 @@ func TestAddDuplicateTodoID(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	list := NewTodoList("0001", "test list")
 	store.AddTodoList(list, "0001")
@@ -128,7 +128,7 @@ func TestCompleteTodo(t *testing.T) {
 	store := NewInMemoryStore()
 
 	user := NewUser("0001", "Steve")
-	store.CreateUser(user)
+	store.addUser(user)
 
 	list := NewTodoList("0001", "test list")
 	store.AddTodoList(list, "0001")

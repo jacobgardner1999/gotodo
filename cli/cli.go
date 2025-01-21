@@ -1,10 +1,11 @@
 package main
 
 import (
-	store "ToDo/store"
+	"ToDo/store"
 	"fmt"
 	"maps"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 
@@ -14,9 +15,10 @@ import (
 type model struct {
 	state      string
 	page       string
-	store      *store.InMemoryStore
+	store      store.Store
 	user       *store.User
 	toDoLists  []*store.TodoList
+	listID     string
 	list       *store.TodoList
 	toDoList   []*store.Todo
 	input      string
@@ -25,12 +27,14 @@ type model struct {
 }
 
 func InitialModel() model {
+	jsonStore, _ := store.NewJsonStore("../data/")
 	return model{
 		state:      "userInput",
 		page:       "login",
-		store:      store.NewInMemoryStore(),
+		store:      jsonStore,
 		user:       &store.User{},
 		toDoLists:  []*store.TodoList{},
+		listID:     "",
 		list:       nil,
 		toDoList:   []*store.Todo{},
 		input:      "",
@@ -42,11 +46,11 @@ func InitialModel() model {
 type Msg string
 
 func (m model) Init() tea.Cmd {
-	m.store.CreateUser("Jacob")
 	return nil
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	re := regexp.MustCompile(`[0-9]+$`)
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch m.state {
@@ -68,6 +72,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			case "h", "left":
+				lists, _ := m.store.GetTodoLists(m.user.ID)
+				m.toDoLists = slices.Collect(maps.Values(lists))
 				switch m.page {
 				case "lists":
 					m.state = "userInput"
@@ -83,11 +89,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				switch m.page {
 				case "lists":
 					m.toDoList = slices.Collect(maps.Values(m.toDoLists[m.cursor].Todos))
+					m.listID = m.toDoLists[m.cursor].ID
 					m.list = m.toDoLists[m.cursor]
 					m.page = "todos"
 					m.cursor = 0
 				case "todos":
-					m.store.CompleteTodo(m.user.ID, m.list.ID, m.toDoList[m.cursor].ID)
+					m.store.ToggleTodo(m.user.ID, m.list.ID, m.toDoList[m.cursor].ID)
+					list, _ := m.store.GetTodoList(m.user.ID, m.listID)
+					m.toDoList = slices.Collect(maps.Values(list.Todos))
 				case "addUser":
 					m.state = "userInput"
 					m.page = "login"
@@ -108,21 +117,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 					m.user = &user
-					m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
+					todos, _ := m.store.GetTodoLists(m.user.ID)
+					m.toDoLists = slices.Collect(maps.Values(todos))
 					m.state = "main"
 					m.page = "lists"
 					m.input = ""
 					m.cursor = 0
 				case "lists":
 					m.store.AddTodoList(store.NewTodoList(strconv.Itoa(len(m.toDoLists)), m.input), m.user.ID)
-					m.toDoLists = slices.Collect(maps.Values(m.user.TodoLists))
+					todos, _ := m.store.GetTodoLists(m.user.ID)
+					m.toDoLists = slices.Collect(maps.Values(todos))
 					m.input = ""
 					m.state = "main"
 					m.cursor = 0
 				case "todos":
 					todo := store.Todo{ID: strconv.Itoa(len(m.toDoList)), Title: m.input, Completed: false}
 					m.store.AddTodo(todo, m.list.ID, m.user.ID)
-					m.toDoList = slices.Collect(maps.Values(m.list.Todos))
+					todos, _ := m.store.GetTodoList(m.user.ID, m.listID)
+					m.toDoList = slices.Collect(maps.Values(todos.Todos))
 					m.input = ""
 					m.state = "main"
 					m.cursor = 0
@@ -133,9 +145,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor = 0
 				}
 			case "backspace":
-				m.input = m.input[:len(m.input)-1]
+				if len(m.input) > 0 {
+					m.input = m.input[:len(m.input)-1]
+				}
 			case "a":
 				if m.page == "login" {
+					m.input = ""
 					m.page = "addUser"
 				} else {
 					m.input += msg.String()
@@ -143,6 +158,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+c":
 				return m, tea.Quit
 			default:
+				if m.page == "login" && !re.MatchString(msg.String()) {
+					return m, nil
+				}
 				m.input += msg.String()
 			}
 		}
@@ -197,7 +215,7 @@ func (m model) View() string {
 	case "userInput":
 		switch m.page {
 		case "login":
-			s += "Enter your User ID to log in: " + m.input + lineBreak + m.loginError + "\n (Press Enter to continue, q to quit, a to add a user\n"
+			s += "Enter your User ID to log in: " + m.input + lineBreak + m.loginError + "\n (Press Enter to continue, ctrl+c to quit, a to add a user)\n"
 			return s
 		case "todos":
 			s += "What do you need to do? " + m.input + lineBreak + "\n (Press Enter to continue)"

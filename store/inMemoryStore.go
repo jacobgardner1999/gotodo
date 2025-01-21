@@ -6,52 +6,19 @@ type InMemoryStore struct {
 	users map[string]*User
 }
 
-type User struct {
-	ID        string
-	Name      string
-	TodoLists map[string]*TodoList
-}
-
-type TodoList struct {
-	ID    string
-	Name  string
-	Todos map[string]*Todo
-}
-
-type Todo struct {
-	ID        string
-	Title     string
-	Completed bool
-}
-
 func NewInMemoryStore() *InMemoryStore {
 	return &InMemoryStore{
 		users: make(map[string]*User),
 	}
 }
 
-func NewUser(id, name string) User {
-	return User{
-		ID:        id,
-		Name:      name,
-		TodoLists: make(map[string]*TodoList),
-	}
-}
-
-func NewTodoList(id, name string) TodoList {
-	return TodoList{
-		ID:    id,
-		Name:  name,
-		Todos: make(map[string]*Todo),
-	}
-}
 func (s *InMemoryStore) CreateUser(username string) (id string, e error) {
 	userID := fmt.Sprintf("%04d", len(s.users)+1)
 	user := NewUser(userID, username)
 
 	err := s.addUser(user)
 	if err != nil {
-		return "", fmt.Errorf(err.Error())
+		return "", fmt.Errorf("%s", err.Error())
 	}
 	return userID, nil
 }
@@ -91,7 +58,7 @@ func (s *InMemoryStore) AddTodo(todo Todo, listID string, userID string) error {
 	return nil
 }
 
-func (s *InMemoryStore) CompleteTodo(userID string, listID string, todoID string) error {
+func (s *InMemoryStore) ToggleTodo(userID string, listID string, todoID string) error {
 	user := s.users[userID]
 	list := user.TodoLists[listID]
 
@@ -101,11 +68,7 @@ func (s *InMemoryStore) CompleteTodo(userID string, listID string, todoID string
 
 	todo := list.Todos[todoID]
 
-	todo.Complete()
+	todo.Toggle()
 
 	return nil
-}
-
-func (t *Todo) Complete() {
-	t.Completed = true
 }
