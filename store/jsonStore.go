@@ -120,7 +120,7 @@ func (s JsonStore) GetUser(userID string) (User, error) {
 	return *s.Users[userID], nil
 }
 
-func (s JsonStore) AddTodoList(list TodoList, userID string) error {
+func (s JsonStore) UpdateTodoList(list TodoList, userID string) error {
 	todos, err := s.GetTodoLists(userID)
 	if err != nil {
 		return err
@@ -141,47 +141,55 @@ func (s JsonStore) AddTodoList(list TodoList, userID string) error {
 	return nil
 }
 
-func (s JsonStore) AddTodo(todo Todo, listID string, userID string) error {
-	todoLists, _ := s.GetTodoLists(userID)
+func (s JsonStore) DeleteTodoList(userID string, listID string) error {
+	todos, err := s.GetTodoLists(userID)
+	if err != nil {
+		return err
+	}
 
-	todoLists[listID].Todos[todo.ID] = &todo
+	delete(todos, listID)
 
-	byteValue, err := json.MarshalIndent(todoLists, "", "  ")
-
+	byteValue, err := json.MarshalIndent(todos, "", "  ")
 	if err != nil {
 		return err
 	}
 
 	err = os.WriteFile(s.storePath+"/"+userID+"lists.json", byteValue, 0644)
-
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
 
+func (s JsonStore) AddTodo(todo Todo, listID string, userID string) error {
+	list, err := s.GetTodoList(userID, listID)
+	if err != nil {
+		return err
+	}
+
+	list.Todos[todo.ID] = &todo
+	if err != nil {
+		return err
+	}
+
+	err = s.UpdateTodoList(list, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s JsonStore) ToggleTodo(userID string, listID string, todoID string) error {
-	todoLists, err := s.GetTodoLists(userID)
+	list, err := s.GetTodoList(userID, listID)
 	if err != nil {
 		return err
 	}
 
-	todos := *todoLists[listID]
+	list.Todos[todoID].Completed = !list.Todos[todoID].Completed
 
-	if _, exists := todos.Todos[todoID]; !exists {
-		return fmt.Errorf("Todo with ID %s does not exist for list ID %s for user ID %s", todoID, listID, userID)
-	}
-
-	todos.Todos[todoID].Completed = !todos.Todos[todoID].Completed
-
-	byteValue, err := json.MarshalIndent(todoLists, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(s.storePath+"/"+userID+"lists.json", byteValue, 0644)
+	err = s.UpdateTodoList(list, userID)
 	if err != nil {
 		return err
 	}

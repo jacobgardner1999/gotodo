@@ -124,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.input = ""
 					m.cursor = 0
 				case "lists":
-					m.store.AddTodoList(store.NewTodoList(strconv.Itoa(len(m.toDoLists)), m.input), m.user.ID)
+					m.store.UpdateTodoList(store.NewTodoList(strconv.Itoa(len(m.toDoLists)), m.input), m.user.ID)
 					todos, _ := m.store.GetTodoLists(m.user.ID)
 					m.toDoLists = slices.Collect(maps.Values(todos))
 					m.input = ""

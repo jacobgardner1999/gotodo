@@ -3,9 +3,10 @@ package store
 type Store interface {
 	CreateUser(username string) (id string, e error)
 	GetUser(id string) (User, error)
-	AddTodoList(list TodoList, userID string) error
 	GetTodoList(userID string, listID string) (TodoList, error)
 	GetTodoLists(userID string) (map[string]*TodoList, error)
+	UpdateTodoList(list TodoList, userID string) error
+	DeleteTodoList(userID string, listID string) error
 	AddTodo(todo Todo, listID string, userID string) error
 	ToggleTodo(userID string, listID string, todoID string) error
 }
