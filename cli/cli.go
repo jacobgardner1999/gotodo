@@ -27,11 +27,11 @@ type model struct {
 }
 
 func InitialModel() model {
-	jsonStore, _ := store.NewJsonStore("../data/")
+	apiStore := store.NewApiStore("8080", "../data/")
 	return model{
 		state:      "userInput",
 		page:       "login",
-		store:      jsonStore,
+		store:      apiStore,
 		user:       &store.User{},
 		toDoLists:  []*store.TodoList{},
 		listID:     "",

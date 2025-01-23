@@ -36,13 +36,14 @@ func NewListHandler(s store.Store) *ListHandler {
 	}
 }
 
-func (h *ListHandler) CreateList(w http.ResponseWriter, r *http.Request) {
+func (h *ListHandler) UpdateList(w http.ResponseWriter, r *http.Request) {
 	var list store.TodoList
 	if err := json.NewDecoder(r.Body).Decode(&list); err != nil {
-		log.Println("Create List - Error Decoding")
+		log.Println("Create List - Error Decoding ", err)
 		InternalServerErrorHandler(w, r)
 		return
 	}
+	log.Println(list)
 
 	matches := ListRe.FindStringSubmatch(r.URL.Path)
 
@@ -52,23 +53,92 @@ func (h *ListHandler) CreateList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.AddTodoList(list, matches[1]); err != nil {
-		log.Println("Create List - Error adding list")
+	if err := h.store.UpdateTodoList(list, matches[1]); err != nil {
+		log.Println("Create List - ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+	log.Println("Update List - Success")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ListHandler) GetLists(w http.ResponseWriter, r *http.Request) {
+	matches := ListRe.FindStringSubmatch(r.URL.Path)
+
+	if len(matches) < 2 {
+		log.Println("Get Lists - Not enough arguments")
 		InternalServerErrorHandler(w, r)
 		return
 	}
 
-	log.Println("Create List - Added \n", list)
+	lists, err := h.store.GetTodoLists(matches[1])
+	if err != nil {
+		log.Println("Get Lists - ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	byteValue, err := json.MarshalIndent(lists, "", "  ")
+	if err != nil {
+		log.Println("Get  Lists - Marshal error ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	log.Println("Get Lists - Success")
+
 	w.WriteHeader(http.StatusOK)
+	w.Write(byteValue)
 }
 
-func (h *ListHandler) GetLists(w http.ResponseWriter, r *http.Request) {}
+func (h *ListHandler) GetList(w http.ResponseWriter, r *http.Request) {
+	matches := ListReWithID.FindStringSubmatch(r.URL.Path)
 
-func (h *ListHandler) GetList(w http.ResponseWriter, r *http.Request) {}
+	if len(matches) < 3 {
+		log.Println("Get List - Not enough arguments")
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
-func (h *ListHandler) UpdateList(w http.ResponseWriter, r *http.Request) {}
+	list, err := h.store.GetTodoList(matches[1], matches[2])
+	if err != nil {
+		log.Println("Get List - ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
 
-func (h *ListHandler) DeleteList(w http.ResponseWriter, r *http.Request) {}
+	byteValue, err := json.MarshalIndent(list, "", "  ")
+	if err != nil {
+		log.Println("Get List - Marshal Error ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	log.Println("Get List - Success")
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(byteValue)
+}
+
+func (h *ListHandler) DeleteList(w http.ResponseWriter, r *http.Request) {
+	matches := ListReWithID.FindStringSubmatch(r.URL.Path)
+
+	if len(matches) < 3 {
+		log.Println("Delete List - Not enough arguments")
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	err := h.store.DeleteTodoList(matches[1], matches[2])
+	if err != nil {
+		log.Println("Delete list - ", err)
+		InternalServerErrorHandler(w, r)
+		return
+	}
+
+	log.Println("Delete List - Success")
+	w.WriteHeader(http.StatusOK)
+}
 
 var (
 	ListRe       = regexp.MustCompile(`^/lists/([^/]+)$`)
@@ -78,7 +148,7 @@ var (
 func (h *ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && ListRe.MatchString(r.URL.Path):
-		h.CreateList(w, r)
+		h.UpdateList(w, r)
 		return
 	case r.Method == http.MethodGet && ListRe.MatchString(r.URL.Path):
 		h.GetLists(w, r)
