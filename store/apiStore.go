@@ -106,7 +106,8 @@ func (s ApiStore) GetTodoList(userID string, listID string) (TodoList, error) {
 
 	var list TodoList
 
-	if err = json.Unmarshal(resBody, list); err != nil {
+	if err = json.Unmarshal(resBody, &list); err != nil {
+		log.Panic(err)
 		return TodoList{}, err
 	}
 
@@ -119,24 +120,20 @@ func (s ApiStore) GetTodoLists(userID string) (map[string]*TodoList, error) {
 	requestURL := fmt.Sprintf("http://localhost:%s/lists/%s", s.serverPort, userID)
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
-		log.Panic("1: ", err)
 		return lists, err
 	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Panic("2: ", err)
 		return lists, err
 	}
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Panic("3: ", err)
 		return lists, err
 	}
 
 	if err = json.Unmarshal(resBody, &lists); err != nil {
-		log.Panic("4: ", err, resBody, res.Status)
 		return lists, err
 	}
 
@@ -144,13 +141,7 @@ func (s ApiStore) GetTodoLists(userID string) (map[string]*TodoList, error) {
 }
 
 func (s ApiStore) UpdateTodoList(list TodoList, userID string) error {
-	todos, err := s.GetTodoLists(userID)
-	if err != nil {
-		return err
-	}
-
-	todos[list.ID] = &list
-	byteValue, err := json.MarshalIndent(todos, "", "  ")
+	byteValue, err := json.MarshalIndent(list, "", "  ")
 
 	bodyReader := bytes.NewReader(byteValue)
 
@@ -173,13 +164,50 @@ func (s ApiStore) UpdateTodoList(list TodoList, userID string) error {
 }
 
 func (s ApiStore) DeleteTodoList(userID string, listID string) error {
+	requestURL := fmt.Sprintf("http://localhost:%s/lists/%s/%s", s.serverPort, userID, listID)
+	req, err := http.NewRequest(http.MethodDelete, requestURL, nil)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != 200 {
+		return fmt.Errorf(res.Status)
+	}
+
 	return nil
 }
 
 func (s ApiStore) AddTodo(todo Todo, listID string, userID string) error {
+	list, err := s.GetTodoList(userID, listID)
+	if err != nil {
+		log.Panic(err)
+		return err
+	}
+	list.Todos[todo.ID] = &todo
+
+	if err = s.UpdateTodoList(list, userID); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s ApiStore) ToggleTodo(userID string, listID string, todoID string) error {
+	list, err := s.GetTodoList(userID, listID)
+	if err != nil {
+		return err
+	}
+
+	list.Todos[todoID].Completed = !list.Todos[todoID].Completed
+
+	if err = s.UpdateTodoList(list, userID); err != nil {
+		return err
+	}
+
 	return nil
 }

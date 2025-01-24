@@ -169,9 +169,6 @@ func (s JsonStore) AddTodo(todo Todo, listID string, userID string) error {
 	}
 
 	list.Todos[todo.ID] = &todo
-	if err != nil {
-		return err
-	}
 
 	err = s.UpdateTodoList(list, userID)
 	if err != nil {

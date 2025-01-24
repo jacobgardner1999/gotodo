@@ -1,9 +1,4 @@
 {
-  "": {
-    "ID": "",
-    "Name": "",
-    "Todos": null
-  },
   "0": {
     "ID": "0",
     "Name": "test",
@@ -16,6 +11,27 @@
       "0": {
         "ID": "0",
         "Title": "test things",
+        "Completed": true
+      },
+      "1": {
+        "ID": "1",
+        "Title": "test",
+        "Completed": true
+      }
+    }
+  },
+  "2": {
+    "ID": "2",
+    "Name": "THIS SHOULD EXIST",
+    "Todos": {
+      "0": {
+        "ID": "0",
+        "Title": "testing",
+        "Completed": true
+      },
+      "1": {
+        "ID": "1",
+        "Title": "more testing",
         "Completed": false
       }
     }
