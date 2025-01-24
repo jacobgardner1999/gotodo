@@ -71,6 +71,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.cursor++
 					}
 				}
+			case "d":
+				switch m.page {
+				case "lists":
+					m.store.DeleteTodoList(m.user.ID, m.toDoLists[m.cursor].ID)
+					todos, _ := m.store.GetTodoLists(m.user.ID)
+					m.toDoLists = slices.Collect(maps.Values(todos))
+					m.cursor = 0
+				}
 			case "h", "left":
 				lists, _ := m.store.GetTodoLists(m.user.ID)
 				m.toDoLists = slices.Collect(maps.Values(lists))
@@ -186,7 +194,7 @@ func (m model) View() string {
 				s += fmt.Sprintf("%s %s\n", cursor, list.Name)
 			}
 			s += lineBreak
-			s += "Press Enter to select, q to quit, a to add list"
+			s += "Press Enter to select, q to quit, a to add list, d to delete list"
 			return s
 		case "todos":
 			s += "Todo list: " + m.list.Name
